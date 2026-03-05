@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(sudo chown -R 501:20 \"/Users/baggyeonglyul/.npm\")",
+      "Bash(npm install --cache /tmp/npm-cache)",
+      "Bash(npx nest build)",
+      "Bash(curl -s http://localhost:5000/health)",
+      "Bash(kill -9 25397)",
+      "Bash(lsof -ti:5000)",
+      "Bash(kill -9 26028)",
+      "Bash(lsof -ti:5001)",
+      "Bash(xargs kill -9)",
+      "Bash(node dist/main.js)",
+      "Bash(npm run dev)",
+      "Bash(curl -s http://localhost:5001/health)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(PGPASSWORD=A0qQrqrIWnpMVokW psql \"postgresql://postgres.okplzivnosqawvoxnndu@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require\" -f schema.sql)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/admin/dashboard)"
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-network"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - traefik-network
+    labels:
+      # Traefik Dashboard (optional, 접근 제한 필요)
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+
+  admin-api:
+    build:
+      context: ./admin-api-nestjs
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DOCKER_NETWORK=traefik-network
+      - GHCR_BACKEND_IMAGE=${GHCR_BACKEND_IMAGE}
+      - GHCR_FRONTEND_IMAGE=${GHCR_FRONTEND_IMAGE}
+      - BASE_DOMAIN=${BASE_DOMAIN}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin-api.rule=Host(`admin.${BASE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.admin-api.entrypoints=websecure"
+      - "traefik.http.routers.admin-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.admin-api.loadbalancer.server.port=5001"
+      # Health endpoint (no auth prefix)
+      - "traefik.http.routers.admin-api-health.rule=Host(`admin.${BASE_DOMAIN}`) && Path(`/health`)"
+      - "traefik.http.routers.admin-api-health.entrypoints=websecure"
+      - "traefik.http.routers.admin-api-health.tls.certresolver=letsencrypt"
+      - "traefik.http.services.admin-api-health.loadbalancer.server.port=5001"
+    depends_on:
+      - traefik
+
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://admin.${BASE_DOMAIN}
+        - NEXT_PUBLIC_API_KEY=${ADMIN_API_KEY}
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.landing.rule=Host(`${BASE_DOMAIN}`) || Host(`www.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.landing.entrypoints=websecure"
+      - "traefik.http.routers.landing.tls.certresolver=letsencrypt"
+      - "traefik.http.services.landing.loadbalancer.server.port=3000"
+    depends_on:
+      - admin-api
+
+networks:
+  traefik-network:
+    name: traefik-network
+    driver: bridge
+
+volumes:
+  letsencrypt:
