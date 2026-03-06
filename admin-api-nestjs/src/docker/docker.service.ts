@@ -236,3 +236,25 @@ export class DockerService {
     }
   }
 }
+
+  async getDockerStatus() {
+    try {
+      const containers = await this.docker.listContainers({ all: true });
+      
+      const status = containers.map((c) => ({
+        id: c.Id.substring(0, 12),
+        name: c.Names[0]?.replace(/^\//, '') || '',
+        image: c.Image,
+        state: c.State,
+        status: c.Status,
+        created: c.Created,
+        tenantId: c.Labels['groumo.tenant.id'],
+        subdomain: c.Labels['groumo.tenant.subdomain'],
+      }));
+
+      return { containers: status, total: status.length };
+    } catch (error) {
+      this.logger.error('Failed to get docker status', error);
+      throw error;
+    }
+  }
