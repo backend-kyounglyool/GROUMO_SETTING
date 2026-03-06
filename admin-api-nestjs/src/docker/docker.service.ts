@@ -199,6 +199,7 @@ export class DockerService {
     subdomain: string;
   }) {
     const backendUrl = `https://${this.configService.get('BASE_DOMAIN')}/api/admin/groups/initialize-tenant`;
+    const adminApiKey = this.configService.get('ADMIN_API_KEY');
 
     try {
       this.logger.log(`Calling backend initialize API: ${backendUrl}`);
@@ -207,6 +208,7 @@ export class DockerService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-API-Key': adminApiKey || '',
         },
         body: JSON.stringify({
           tenantId: params.tenantId,
@@ -219,7 +221,8 @@ export class DockerService {
       });
 
       if (!response.ok) {
-        throw new Error(`Backend API returned ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Backend API returned ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
