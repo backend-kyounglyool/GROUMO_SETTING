@@ -102,6 +102,6 @@ export interface DockerContainer {
 }
 
 export async function getDockerStatus(): Promise<{ containers: DockerContainer[]; total: number }> {
-  const res = await request<{ containers: DockerContainer[]; total: number }>('/api/tenants/docker/status');
+  const res = await request<{ success: boolean; data: { containers: DockerContainer[]; total: number } }>('/api/tenants/docker/status');
   return res.data || { containers: [], total: 0 };
 }
