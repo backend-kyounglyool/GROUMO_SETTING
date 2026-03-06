@@ -46,16 +46,30 @@ export class DockerService {
     tenantId: string;
     subdomain: string;
     organizationName: string;
+    organizationNameEn: string;
+    organizationType: string;
+    school?: string;
   }): Promise<DeployResult> {
-    const { tenantId, subdomain, organizationName } = params;
+    const { tenantId, subdomain, organizationName, organizationNameEn, organizationType, school } = params;
     const baseDomain = this.configService.get<string>('BASE_DOMAIN');
     const network = this.configService.get<string>('DOCKER_NETWORK');
 
     try {
       this.logger.log(`Deploying tenant: ${subdomain} (${organizationName})`);
 
+      // 1. 스키마 생성
       const schemaName = `tenant_${subdomain.replace(/-/g, '_')}`;
       await this.databaseService.createSchema(schemaName);
+      
+      // 2. 단체 정보를 group 테이블에 초기화
+      await this.databaseService.initializeTenantData(schemaName, {
+        tenantId,
+        organizationName,
+        organizationNameEn,
+        organizationType,
+        school,
+        subdomain,
+      });
 
       const backendContainer = await this.createContainer({
         name: `${subdomain}-backend`,

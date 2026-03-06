@@ -16,16 +16,24 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`);
-      const data = await res.json();
+      // API Key 검증 - 실제 인증이 필요한 엔드포인트 호출
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tenants?page=1&limit=1`, {
+        headers: {
+          'X-API-Key': apiKey
+        }
+      });
 
-      if (data.success) {
+      if (res.ok) {
+        // API Key가 유효함
         sessionStorage.setItem('admin_api_key', apiKey);
         router.push('/admin/dashboard');
+      } else if (res.status === 401 || res.status === 403) {
+        setError('API Key가 올바르지 않습니다');
       } else {
-        setError('서버에 연결할 수 없습니다');
+        setError('서버 오류가 발생했습니다');
       }
-    } catch {
+    } catch (err) {
+      console.error('Login error:', err);
       setError('서버에 연결할 수 없습니다');
     } finally {
       setLoading(false);

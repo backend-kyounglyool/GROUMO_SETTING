@@ -109,6 +109,9 @@ export class TenantController {
         tenantId: id,
         subdomain: tenant.subdomain,
         organizationName: tenant.organization_name,
+        organizationNameEn: tenant.organization_name_en,
+        organizationType: tenant.organization_type,
+        school: tenant.school,
       });
 
       await this.tenantService.updateTenantStatus(id, 'deployed', {

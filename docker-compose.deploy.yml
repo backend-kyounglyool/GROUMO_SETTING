@@ -1,0 +1,79 @@
+# GROUMO_SETTING 배포용 (기존 Traefik 사용)
+services:
+  admin-api:
+    build:
+      context: ./admin-api-nestjs
+      dockerfile: Dockerfile
+    container_name: groumo-admin-api
+    restart: unless-stopped
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DOCKER_NETWORK=traefik-network
+      - GHCR_BACKEND_IMAGE=${GHCR_BACKEND_IMAGE}
+      - GHCR_FRONTEND_IMAGE=${GHCR_FRONTEND_IMAGE}
+      - BASE_DOMAIN=${BASE_DOMAIN}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      # Admin Dashboard (/)
+      - "traefik.http.routers.groumo-admin-dashboard.rule=Host(`admin.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.groumo-admin-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.groumo-admin-dashboard.tls=true"
+      - "traefik.http.routers.groumo-admin-dashboard.service=groumo-landing"
+      # Admin API (/api)
+      - "traefik.http.routers.groumo-admin-api.rule=Host(`admin.${BASE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.groumo-admin-api.entrypoints=websecure"
+      - "traefik.http.routers.groumo-admin-api.tls=true"
+      - "traefik.http.services.groumo-admin-api.loadbalancer.server.port=5001"
+      # Health endpoint
+      - "traefik.http.routers.groumo-admin-health.rule=Host(`admin.${BASE_DOMAIN}`) && Path(`/health`)"
+      - "traefik.http.routers.groumo-admin-health.entrypoints=websecure"
+      - "traefik.http.routers.groumo-admin-health.tls=true"
+
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://admin.${BASE_DOMAIN}
+        - NEXT_PUBLIC_API_KEY=${ADMIN_API_KEY}
+    container_name: groumo-landing
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      # Apply page (apply.groumo.com)
+      - "traefik.http.routers.groumo-apply.rule=Host(`apply.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.groumo-apply.entrypoints=websecure"
+      - "traefik.http.routers.groumo-apply.tls=true"
+      - "traefik.http.services.groumo-landing.loadbalancer.server.port=3000"
+      # Admin Dashboard root redirect (admin.groumo.com → /admin)
+      - "traefik.http.routers.groumo-admin-redirect.rule=Host(`admin.${BASE_DOMAIN}`) && Path(`/`)"
+      - "traefik.http.routers.groumo-admin-redirect.entrypoints=websecure"
+      - "traefik.http.routers.groumo-admin-redirect.tls=true"
+      - "traefik.http.routers.groumo-admin-redirect.middlewares=admin-redirect"
+      - "traefik.http.middlewares.admin-redirect.redirectregex.regex=^https://admin\\.${BASE_DOMAIN}/$$"
+      - "traefik.http.middlewares.admin-redirect.redirectregex.replacement=https://admin.${BASE_DOMAIN}/admin"
+      - "traefik.http.middlewares.admin-redirect.redirectregex.permanent=true"
+      # Admin Dashboard (admin.groumo.com without /api and not root)
+      - "traefik.http.routers.groumo-admin-web.rule=Host(`admin.${BASE_DOMAIN}`) && !PathPrefix(`/api`) && !Path(`/health`) && !Path(`/`)"
+      - "traefik.http.routers.groumo-admin-web.entrypoints=websecure"
+      - "traefik.http.routers.groumo-admin-web.tls=true"
+    depends_on:
+      - admin-api
+
+networks:
+  traefik-network:
+    external: true
+    name: traefik-network

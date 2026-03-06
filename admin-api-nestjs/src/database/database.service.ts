@@ -73,6 +73,48 @@ export class DatabaseService implements OnModuleDestroy {
     }
   }
 
+  async initializeTenantData(
+    schemaName: string,
+    organizationData: {
+      tenantId: string;
+      organizationName: string;
+      organizationNameEn: string;
+      organizationType: string;
+      school?: string;
+      subdomain: string;
+    },
+  ): Promise<any> {
+    const client = await this.pool.connect();
+
+    try {
+      this.logger.log(`Initializing tenant data for: ${schemaName}`);
+
+      // group 테이블에 단체 정보 insert
+      const description = `${organizationData.organizationType}${
+        organizationData.school ? ` - ${organizationData.school}` : ''
+      }\n영문명: ${organizationData.organizationNameEn}\n서브도메인: ${
+        organizationData.subdomain
+      }`;
+
+      const result = await client.query(
+        `
+        INSERT INTO "${schemaName}".groups (id, name, description, created_at, updated_at)
+        VALUES ($1, $2, $3, NOW(), NOW())
+        RETURNING *
+      `,
+        [organizationData.tenantId, organizationData.organizationName, description],
+      );
+
+      this.logger.log(`Tenant data initialized for: ${schemaName}`);
+      return result.rows[0];
+    } catch (error) {
+      this.logger.error(`Tenant data initialization failed:`, error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async testConnection(): Promise<boolean> {
     const client = await this.pool.connect();
     try {
