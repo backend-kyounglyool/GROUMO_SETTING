@@ -71,35 +71,12 @@ export class DockerService {
         subdomain,
       });
 
-      const backendContainer = await this.createContainer({
-        name: `${subdomain}-backend`,
-        image: this.configService.get<string>('GHCR_BACKEND_IMAGE')!,
-        env: [
-          `SUPABASE_URL=${this.configService.get('SUPABASE_URL')}`,
-          `SUPABASE_ANON_KEY=${this.configService.get('SUPABASE_ANON_KEY')}`,
-          `DB_SCHEMA=${schemaName}`,
-          `TENANT_ID=${tenantId}`,
-          `SUBDOMAIN=${subdomain}`,
-          `ORGANIZATION_NAME=${organizationName}`,
-        ],
-        labels: {
-          'traefik.enable': 'true',
-          [`traefik.http.routers.${subdomain}-backend.rule`]: `Host(\`${subdomain}.${baseDomain}\`) && PathPrefix(\`/api\`)`,
-          [`traefik.http.routers.${subdomain}-backend.entrypoints`]: 'websecure',
-          [`traefik.http.routers.${subdomain}-backend.tls`]: 'true',
-          [`traefik.http.services.${subdomain}-backend.loadbalancer.server.port`]: '8080',
-          'com.centurylinklabs.watchtower.enable': 'true',
-          'groumo.tenant.id': tenantId,
-          'groumo.tenant.subdomain': subdomain,
-        },
-        network: network!,
-      });
-
+      // Frontend만 배포 (Backend는 groumo.com 공유)
       const frontendContainer = await this.createContainer({
         name: `${subdomain}-frontend`,
         image: this.configService.get<string>('GHCR_FRONTEND_IMAGE')!,
         env: [
-          `NEXT_PUBLIC_API_URL=https://${subdomain}.${baseDomain}/api`,
+          `NEXT_PUBLIC_API_URL=https://groumo.com/api`,  // 공유 Backend 사용
           `NEXT_PUBLIC_SUPABASE_URL=${this.configService.get('SUPABASE_URL')}`,
           `NEXT_PUBLIC_SUPABASE_ANON_KEY=${this.configService.get('SUPABASE_ANON_KEY')}`,
           `TENANT_ID=${tenantId}`,
@@ -118,15 +95,14 @@ export class DockerService {
         network: network!,
       });
 
-      await backendContainer.start();
       await frontendContainer.start();
 
-      this.logger.log(`Tenant deployed: ${subdomain}`);
+      this.logger.log(`Tenant deployed: ${subdomain} (Frontend only, shared Backend)`);
 
       return {
         subdomain,
         url: `https://${subdomain}.${baseDomain}`,
-        backend_container: backendContainer.id,
+        backend_container: 'shared',  // Backend 공유
         frontend_container: frontendContainer.id,
         schema: schemaName,
         deployed_at: new Date().toISOString(),
