@@ -193,3 +193,34 @@ export class TenantController {
     return { success: true, data: status };
   }
 }
+
+/**
+ * Public 테넌트 조회 API (인증 불필요)
+ * Frontend에서 subdomain으로 tenant ID를 조회할 때 사용
+ */
+@Controller('api/public/tenants')
+export class PublicTenantController {
+  constructor(private readonly tenantService: TenantService) {}
+
+  /**
+   * Subdomain으로 테넌트 조회 (deployed 상태만)
+   */
+  @Get('by-subdomain/:subdomain')
+  async getTenantBySubdomain(@Param('subdomain') subdomain: string) {
+    const tenant = await this.tenantService.getTenantBySubdomain(subdomain);
+    
+    if (!tenant) {
+      throw new NotFoundException('테넌트를 찾을 수 없습니다');
+    }
+
+    return {
+      success: true,
+      data: {
+        id: tenant.id,
+        subdomain: tenant.subdomain,
+        organizationName: tenant.organization_name,
+        organizationNameEn: tenant.organization_name_en,
+      },
+    };
+  }
+}

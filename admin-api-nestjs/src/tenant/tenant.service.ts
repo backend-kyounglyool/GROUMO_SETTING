@@ -79,6 +79,21 @@ export class TenantService {
     return data !== null && data.length > 0;
   }
 
+  async getTenantBySubdomain(subdomain: string) {
+    const { data: tenant, error } = await this.supabase
+      .from('tenants')
+      .select('*')
+      .eq('subdomain', subdomain)
+      .eq('status', 'deployed')  // deployed 상태만 조회
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(`DB Error: ${error.message}`);
+    }
+
+    return tenant;
+  }
+
   async updateTenantStatus(
     id: string,
     status: string,
