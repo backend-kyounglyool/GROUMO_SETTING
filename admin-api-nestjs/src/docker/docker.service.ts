@@ -79,6 +79,7 @@ export class DockerService {
           `NEXT_PUBLIC_API_URL=https://groumo.com/api`,  // 공유 Backend 사용
           `NEXT_PUBLIC_SUPABASE_URL=${this.configService.get('SUPABASE_URL')}`,
           `NEXT_PUBLIC_SUPABASE_ANON_KEY=${this.configService.get('SUPABASE_ANON_KEY')}`,
+          `NEXT_PUBLIC_TENANT_ID=${tenantId}`,  // 클라이언트 사이드 접근용
           `TENANT_ID=${tenantId}`,
           `SUBDOMAIN=${subdomain}`,
         ],
@@ -235,3 +236,25 @@ export class DockerService {
     }
   }
 }
+
+  async getDockerStatus() {
+    try {
+      const containers = await this.docker.listContainers({ all: true });
+      
+      const status = containers.map((c) => ({
+        id: c.Id.substring(0, 12),
+        name: c.Names[0]?.replace(/^\//, '') || '',
+        image: c.Image,
+        state: c.State,
+        status: c.Status,
+        created: c.Created,
+        tenantId: c.Labels['groumo.tenant.id'],
+        subdomain: c.Labels['groumo.tenant.subdomain'],
+      }));
+
+      return { containers: status, total: status.length };
+    } catch (error) {
+      this.logger.error('Failed to get docker status', error);
+      throw error;
+    }
+  }

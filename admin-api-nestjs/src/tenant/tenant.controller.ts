@@ -187,3 +187,9 @@ export class TenantController {
     };
   }
 }
+
+  @Get('docker/status')
+  async getDockerStatus() {
+    const status = await this.dockerService.getDockerStatus();
+    return { success: true, data: status };
+  }
