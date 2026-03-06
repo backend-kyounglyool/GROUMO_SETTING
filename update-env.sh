@@ -1,0 +1,51 @@
+#!/bin/bash
+# GROUMO_SETTING 환경변수 업데이트 스크립트
+
+set -e
+
+echo "🚀 GROUMO_SETTING 환경변수 업데이트 시작..."
+
+# .env 백업
+if [ -f .env ]; then
+    cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+    echo "✅ 기존 .env 백업 완료"
+fi
+
+# 새 환경변수로 업데이트
+cat > .env << 'EOF'
+# === Domain ===
+BASE_DOMAIN=groumo.com
+
+# === Let's Encrypt ===
+ACME_EMAIL=p_yool@naver.com
+
+# === Traefik Dashboard (htpasswd format) ===
+# admin / groumo2026
+TRAEFIK_DASHBOARD_AUTH=admin:$$2y$$05$$qXoJ8jKvJ5F5F5F5F5F5FeYvXZJJJJJJJJJJJJJJJJJJJJJJJJJJJJO
+
+# === Supabase (GROUMO_SETTING 전용) ===
+SUPABASE_URL=https://okplzivnosqawvoxnndu.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rcGx6aXZub3NxYXd2b3hubmR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2OTU2NjYsImV4cCI6MjA4ODI3MTY2Nn0.EIZ5cqTKUqN18dpySXD1Ox6NEIasbg-11TtdBotOVok
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rcGx6aXZub3NxYXd2b3hubmR1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY5NTY2NiwiZXhwIjoyMDg4MjcxNjY2fQ.KMiB2mOLGnkp1uPzRpJdkFLTpoZ-oUzsEDAjUM9XB2k
+DATABASE_URL=postgresql://postgres.okplzivnosqawvoxnndu:Eqe5USGRXEmkn4CI@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
+
+# === Supabase (RANDOM_GROUP / GROUMO_TEMPLATE 전용) ===
+# 테넌트 Frontend와 Backend가 사용할 Supabase (GROUMO_SETTING과 완전히 분리)
+TEMPLATE_SUPABASE_URL=https://nbdkcefclvnvxykitdpg.supabase.co
+TEMPLATE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iZGtjZWZjbHZudnh5a2l0ZHBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNTg0MTAsImV4cCI6MjA4NzkzNDQxMH0.EQDwIYTvu_-L7s_4ffATzQv1D55po7pcWPqBjcEkEXE
+TEMPLATE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iZGtjZWZjbHZudnh5a2l0ZHBnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM1ODQxMCwiZXhwIjoyMDg3OTM0NDEwfQ.AiYw0H6TDe_oQ8l6SI1dDtuKJrM6BUegun2xB_bcv4Q
+
+# === Admin API ===
+ADMIN_API_KEY=c0b4a863f4f1db5d917e0c6d2e4dcd52e4c2c67c7d343e4bb101e589bc5336a5
+
+# === Tenant Docker Images (GHCR) ===
+GHCR_BACKEND_IMAGE=ghcr.io/backend-kyounglyool/random_group/backend:latest
+GHCR_FRONTEND_IMAGE=ghcr.io/backend-kyounglyool/random_group/frontend:latest
+EOF
+
+echo "✅ .env 업데이트 완료"
+echo ""
+echo "📋 다음 단계:"
+echo "  1. docker-compose down"
+echo "  2. docker-compose up -d"
+echo "  3. docker logs groumo_setting-admin-api-1 --tail 50"
