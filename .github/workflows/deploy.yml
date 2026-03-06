@@ -1,0 +1,67 @@
+name: Build and Push GROUMO_SETTING to GHCR
+
+on:
+  push:
+    branches:
+      - main
+      - feature/docker-status  # 현재 브랜치도 포함
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_ADMIN_API: backend-kyounglyool/groumo_setting/admin-api
+  IMAGE_NAME_LANDING: backend-kyounglyool/groumo_setting/landing
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for admin-api
+        id: meta-admin-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_ADMIN_API }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Build and push admin-api image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./admin-api-nestjs
+          push: true
+          tags: ${{ steps.meta-admin-api.outputs.tags }}
+          labels: ${{ steps.meta-admin-api.outputs.labels }}
+
+      - name: Extract metadata for landing
+        id: meta-landing
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LANDING }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Build and push landing image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./landing
+          push: true
+          tags: ${{ steps.meta-landing.outputs.tags }}
+          labels: ${{ steps.meta-landing.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://admin.groumo.com
+            NEXT_PUBLIC_API_KEY=${{ secrets.ADMIN_API_KEY }}

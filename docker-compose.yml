@@ -33,10 +33,10 @@ services:
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
   admin-api:
-    build:
-      context: ./admin-api-nestjs
-      dockerfile: Dockerfile
+    image: ghcr.io/backend-kyounglyool/groumo_setting/admin-api:latest
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     environment:
       - PORT=5001
       - NODE_ENV=production
@@ -69,12 +69,7 @@ services:
       - traefik
 
   landing:
-    build:
-      context: ./landing
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=https://admin.${BASE_DOMAIN}
-        - NEXT_PUBLIC_API_KEY=${ADMIN_API_KEY}
+    image: ghcr.io/backend-kyounglyool/groumo_setting/landing:latest
     restart: unless-stopped
     networks:
       - traefik-network
@@ -84,8 +79,22 @@ services:
       - "traefik.http.routers.landing.entrypoints=websecure"
       - "traefik.http.routers.landing.tls.certresolver=letsencrypt"
       - "traefik.http.services.landing.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       - admin-api
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=300  # 5분마다 체크
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true  # 라벨이 있는 컨테이너만 업데이트
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+    networks:
+      - traefik-network
 
 networks:
   traefik-network:
