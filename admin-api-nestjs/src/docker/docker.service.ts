@@ -61,8 +61,8 @@ export class DockerService {
       const schemaName = `tenant_${subdomain.replace(/-/g, '_')}`;
       await this.databaseService.createSchema(schemaName);
       
-      // 2. 단체 정보를 group 테이블에 초기화
-      await this.databaseService.initializeTenantData(schemaName, {
+      // 2. Backend API를 호출하여 group 테이블에 조직 정보 추가
+      await this.callBackendInitializeApi({
         tenantId,
         organizationName,
         organizationNameEn,
@@ -185,5 +185,50 @@ export class DockerService {
         RestartPolicy: { Name: 'unless-stopped' },
       },
     });
+  }
+
+  /**
+   * Backend API를 호출하여 group 테이블 초기화
+   */
+  private async callBackendInitializeApi(params: {
+    tenantId: string;
+    organizationName: string;
+    organizationNameEn: string;
+    organizationType: string;
+    school?: string;
+    subdomain: string;
+  }) {
+    const backendUrl = `https://${this.configService.get('BASE_DOMAIN')}/api/admin/groups/initialize-tenant`;
+
+    try {
+      this.logger.log(`Calling backend initialize API: ${backendUrl}`);
+
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tenantId: params.tenantId,
+          organizationName: params.organizationName,
+          organizationNameEn: params.organizationNameEn,
+          organizationType: params.organizationType,
+          school: params.school,
+          subdomain: params.subdomain,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend API returned ${response.status}`);
+      }
+
+      const result = await response.json();
+      this.logger.log(`Backend initialize result: ${JSON.stringify(result)}`);
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to call backend initialize API`, error);
+      throw error;
+    }
   }
 }
