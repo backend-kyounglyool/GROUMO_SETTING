@@ -89,3 +89,19 @@ export async function rejectTenant(id: string, reason: string): Promise<SingleRe
 export async function deleteTenant(id: string): Promise<{ success: boolean; message: string }> {
   return request(`/api/tenants/${id}`, { method: 'DELETE' });
 }
+
+export interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  created: number;
+  tenantId?: string;
+  subdomain?: string;
+}
+
+export async function getDockerStatus(): Promise<{ containers: DockerContainer[]; total: number }> {
+  const res = await request<{ containers: DockerContainer[]; total: number }>('/api/tenants/docker/status');
+  return res.data || { containers: [], total: 0 };
+}
