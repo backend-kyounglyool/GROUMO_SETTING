@@ -35,8 +35,6 @@ services:
   admin-api:
     image: ghcr.io/backend-kyounglyool/groumo_setting/admin-api:latest
     restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
     environment:
       - PORT=5001
       - NODE_ENV=production
@@ -55,6 +53,7 @@ services:
     networks:
       - traefik-network
     labels:
+      - "com.centurylinklabs.watchtower.enable=true"
       - "traefik.enable=true"
       - "traefik.http.routers.admin-api.rule=Host(`admin.${BASE_DOMAIN}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.admin-api.entrypoints=websecure"
