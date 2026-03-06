@@ -53,15 +53,13 @@ export class DockerService {
     const { tenantId, subdomain, organizationName, organizationNameEn, organizationType, school } = params;
     const baseDomain = this.configService.get<string>('BASE_DOMAIN');
     const network = this.configService.get<string>('DOCKER_NETWORK');
+    const schemaName = `tenant_${tenantId.replace(/-/g, '_')}`;
 
     try {
-      this.logger.log(`Deploying tenant: ${subdomain} (${organizationName})`);
+      this.logger.log(`🚀 Deploying tenant: ${subdomain} (${organizationName})`);
 
-      // 1. 스키마 생성
-      const schemaName = `tenant_${subdomain.replace(/-/g, '_')}`;
-      await this.databaseService.createSchema(schemaName);
-      
-      // 2. Backend API를 호출하여 group 테이블에 조직 정보 추가
+      // 1. Backend API 호출 - 스키마 생성 + 초기화
+      // Backend가 모든 멀티테넌트 로직을 담당 (관심사의 분리)
       await this.callBackendInitializeApi({
         tenantId,
         organizationName,
@@ -71,7 +69,9 @@ export class DockerService {
         subdomain,
       });
 
-      // Frontend만 배포 (Backend는 groumo.com 공유)
+      this.logger.log(`✅ Backend initialized tenant: ${tenantId}`);
+
+      // 2. Frontend 컨테이너 배포 (Backend는 groumo.com 공유)
       const frontendContainer = await this.createContainer({
         name: `${subdomain}-frontend`,
         image: this.configService.get<string>('GHCR_FRONTEND_IMAGE')!,
@@ -79,7 +79,7 @@ export class DockerService {
           `NEXT_PUBLIC_API_URL=https://groumo.com/api`,  // 공유 Backend 사용
           `NEXT_PUBLIC_SUPABASE_URL=${this.configService.get('SUPABASE_URL')}`,
           `NEXT_PUBLIC_SUPABASE_ANON_KEY=${this.configService.get('SUPABASE_ANON_KEY')}`,
-          `NEXT_PUBLIC_TENANT_ID=${tenantId}`,  // 클라이언트 사이드 접근용
+          `NEXT_PUBLIC_TENANT_ID=${tenantId}`,  // 클라이언트 사이드에서 API 호출 시 헤더에 포함
           `TENANT_ID=${tenantId}`,
           `SUBDOMAIN=${subdomain}`,
         ],
@@ -98,18 +98,18 @@ export class DockerService {
 
       await frontendContainer.start();
 
-      this.logger.log(`Tenant deployed: ${subdomain} (Frontend only, shared Backend)`);
+      this.logger.log(`✅ Tenant deployed: ${subdomain} (Frontend only, Backend shared)`);
 
       return {
         subdomain,
         url: `https://${subdomain}.${baseDomain}`,
-        backend_container: 'shared',  // Backend 공유
+        backend_container: 'shared',  // Backend 공유 (groumo.com)
         frontend_container: frontendContainer.id,
         schema: schemaName,
         deployed_at: new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error(`Deployment failed for ${subdomain}:`, error);
+      this.logger.error(`❌ Deployment failed for ${subdomain}:`, error);
       throw error;
     }
   }
