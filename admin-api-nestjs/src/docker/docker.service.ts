@@ -77,8 +77,9 @@ export class DockerService {
         image: this.configService.get<string>('GHCR_FRONTEND_IMAGE')!,
         env: [
           `NEXT_PUBLIC_API_URL=https://groumo.com/api`,  // 공유 Backend 사용
-          `NEXT_PUBLIC_SUPABASE_URL=${this.configService.get('SUPABASE_URL')}`,
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY=${this.configService.get('SUPABASE_ANON_KEY')}`,
+          // GROUMO_TEMPLATE 전용 Supabase 사용 (GROUMO_SETTING과 분리)
+          `NEXT_PUBLIC_SUPABASE_URL=${this.configService.get('TEMPLATE_SUPABASE_URL')}`,
+          `NEXT_PUBLIC_SUPABASE_ANON_KEY=${this.configService.get('TEMPLATE_SUPABASE_ANON_KEY')}`,
           `NEXT_PUBLIC_TENANT_ID=${tenantId}`,  // 클라이언트 사이드에서 API 호출 시 헤더에 포함
           `TENANT_ID=${tenantId}`,
           `SUBDOMAIN=${subdomain}`,
