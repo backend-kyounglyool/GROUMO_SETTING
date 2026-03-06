@@ -235,7 +235,6 @@ export class DockerService {
       throw error;
     }
   }
-}
 
   async getDockerStatus() {
     try {
@@ -258,3 +257,4 @@ export class DockerService {
       throw error;
     }
   }
+}
