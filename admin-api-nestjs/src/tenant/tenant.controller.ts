@@ -81,6 +81,12 @@ export class TenantController {
     };
   }
 
+  @Get('docker/status')
+  async getDockerStatus() {
+    const status = await this.dockerService.getDockerStatus();
+    return { success: true, data: status };
+  }
+
   @Get(':id')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     const tenant = await this.tenantService.getTenantById(id);
@@ -104,6 +110,21 @@ export class TenantController {
 
     await this.tenantService.updateTenantStatus(id, 'approved');
 
+    const skipDeploy = process.env.SKIP_DEPLOY === 'true' || process.env.NODE_ENV !== 'production';
+
+    if (skipDeploy) {
+      await this.tenantService.updateTenantStatus(id, 'deployed', {
+        deployed_at: new Date(),
+        deployment_info: { message: 'Deployment skipped (non-production)' },
+      });
+
+      return {
+        success: true,
+        message: '승인 완료 (배포 스킵 - 개발 환경)',
+        data: { tenant: await this.tenantService.getTenantById(id) },
+      };
+    }
+
     try {
       const deployment = await this.dockerService.deployTenant({
         tenantId: id,
@@ -115,7 +136,7 @@ export class TenantController {
       });
 
       await this.tenantService.updateTenantStatus(id, 'deployed', {
-        deployed_at: new Date().toISOString(),
+        deployed_at: new Date(),
         deployment_info: deployment,
       });
 
@@ -149,7 +170,7 @@ export class TenantController {
     }
 
     await this.tenantService.updateTenantStatus(id, 'rejected', {
-      rejected_at: new Date().toISOString(),
+      rejected_at: new Date(),
       rejection_reason: dto.reason,
     });
 
@@ -187,9 +208,3 @@ export class TenantController {
     };
   }
 }
-
-  @Get('docker/status')
-  async getDockerStatus() {
-    const status = await this.dockerService.getDockerStatus();
-    return { success: true, data: status };
-  }

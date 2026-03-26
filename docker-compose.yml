@@ -1,4 +1,25 @@
 services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    networks:
+      - traefik-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   traefik:
     image: traefik:v3.3
     restart: unless-stopped
@@ -23,7 +44,6 @@ services:
     networks:
       - traefik-network
     labels:
-      # Traefik Dashboard (optional, 접근 제한 필요)
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${BASE_DOMAIN}`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
@@ -40,10 +60,11 @@ services:
     environment:
       - PORT=5001
       - NODE_ENV=production
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - DATABASE_URL=${DATABASE_URL}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
       - DOCKER_SOCKET=/var/run/docker.sock
       - DOCKER_NETWORK=traefik-network
       - GHCR_BACKEND_IMAGE=${GHCR_BACKEND_IMAGE}
@@ -60,13 +81,15 @@ services:
       - "traefik.http.routers.admin-api.entrypoints=websecure"
       - "traefik.http.routers.admin-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.admin-api.loadbalancer.server.port=5001"
-      # Health endpoint (no auth prefix)
       - "traefik.http.routers.admin-api-health.rule=Host(`admin.${BASE_DOMAIN}`) && Path(`/health`)"
       - "traefik.http.routers.admin-api-health.entrypoints=websecure"
       - "traefik.http.routers.admin-api-health.tls.certresolver=letsencrypt"
       - "traefik.http.services.admin-api-health.loadbalancer.server.port=5001"
     depends_on:
-      - traefik
+      mysql:
+        condition: service_healthy
+      traefik:
+        condition: service_started
 
   landing:
     build:
@@ -93,4 +116,5 @@ networks:
     driver: bridge
 
 volumes:
+  mysql-data:
   letsencrypt:

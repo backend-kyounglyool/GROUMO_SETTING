@@ -1,73 +1,47 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool } from 'pg';
+import * as mysql from 'mysql2/promise';
 
-/**
- * 데이터베이스 서비스
- * 
- * 역할:
- * - GROUMO_SETTING의 tenants 테이블 관리
- * - 데이터베이스 헬스체크
- * 
- * 주의: 멀티테넌트 스키마 관리는 GROUMO_TEMPLATE Backend 담당
- * 
- * @author Senior Backend Developer
- */
 @Injectable()
-export class DatabaseService implements OnModuleDestroy {
-  private readonly pool: Pool;
+export class DatabaseService implements OnModuleInit, OnModuleDestroy {
+  private pool!: mysql.Pool;
   private readonly logger = new Logger(DatabaseService.name);
 
-  constructor(private readonly configService: ConfigService) {
-    this.pool = new Pool({
-      connectionString: this.configService.get<string>('DATABASE_URL'),
-      ssl: { rejectUnauthorized: false },
+  constructor(private readonly configService: ConfigService) {}
+
+  async onModuleInit() {
+    this.pool = mysql.createPool({
+      host: this.configService.get<string>('MYSQL_HOST', 'localhost'),
+      port: this.configService.get<number>('MYSQL_PORT', 3306),
+      user: this.configService.get<string>('MYSQL_USER', 'groumo'),
+      password: this.configService.get<string>('MYSQL_PASSWORD', 'groumo'),
+      database: this.configService.get<string>('MYSQL_DATABASE', 'groumo'),
+      waitForConnections: true,
+      connectionLimit: 10,
+      timezone: '+09:00',
     });
+
+    await this.testConnection();
   }
 
   async onModuleDestroy() {
     await this.pool.end();
   }
 
-  /**
-   * 데이터베이스 연결 테스트
-   * 헬스체크용
-   */
-  async testConnection(): Promise<boolean> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query('SELECT NOW()');
-      this.logger.log(`Database connected: ${result.rows[0].now}`);
-      return true;
-    } catch (error) {
-      this.logger.error('Database connection failed:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
+  async query(sql: string, params: any[] = []): Promise<any[]> {
+    const [rows] = await this.pool.query(sql, params);
+    return rows as any[];
   }
 
-  /* ========================================
-   * 아래 메서드들은 더 이상 사용하지 않음
-   * Backend가 멀티테넌트 스키마 관리 담당
-   * ======================================== */
-
-  /**
-   * @deprecated Backend의 TenantService가 담당
-   * 
-   * 스키마 생성은 GROUMO_TEMPLATE Backend에서 처리
-   * DockerService는 Backend API만 호출
-   */
-  // async createSchema(schemaName: string): Promise<string> { ... }
-
-  /**
-   * @deprecated Backend의 TenantService가 담당
-   */
-  // async dropSchema(schemaName: string): Promise<boolean> { ... }
-
-  /**
-   * @deprecated Backend의 TenantService가 담당
-   */
-  // async initializeTenantData(...): Promise<any> { ... }
+  async testConnection(): Promise<boolean> {
+    try {
+      const [rows] = await this.pool.execute('SELECT NOW() as now');
+      const now = (rows as any[])[0]?.now;
+      this.logger.log(`MySQL connected: ${now}`);
+      return true;
+    } catch (error) {
+      this.logger.error('MySQL connection failed:', error);
+      throw error;
+    }
+  }
 }
-

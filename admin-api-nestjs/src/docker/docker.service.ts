@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Docker from 'dockerode';
-import { DatabaseService } from '../database/database.service';
 
 export interface DeployResult {
   subdomain: string;
   url: string;
-  backend_container: string;
   frontend_container: string;
   schema: string;
   deployed_at: string;
@@ -31,10 +29,7 @@ export class DockerService {
   private readonly docker: Docker;
   private readonly logger = new Logger(DockerService.name);
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly databaseService: DatabaseService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     this.docker = new Docker({
       socketPath:
         this.configService.get<string>('DOCKER_SOCKET') ||
@@ -56,10 +51,8 @@ export class DockerService {
     const schemaName = `tenant_${tenantId.replace(/-/g, '_')}`;
 
     try {
-      this.logger.log(`🚀 Deploying tenant: ${subdomain} (${organizationName})`);
+      this.logger.log(`Deploying tenant: ${subdomain} (${organizationName})`);
 
-      // 1. Backend API 호출 - 스키마 생성 + 초기화
-      // Backend가 모든 멀티테넌트 로직을 담당 (관심사의 분리)
       await this.callBackendInitializeApi({
         tenantId,
         organizationName,
@@ -69,18 +62,14 @@ export class DockerService {
         subdomain,
       });
 
-      this.logger.log(`✅ Backend initialized tenant: ${tenantId}`);
+      this.logger.log(`Backend initialized tenant: ${tenantId}`);
 
-      // 2. Frontend 컨테이너 배포 (Backend는 groumo.com 공유)
       const frontendContainer = await this.createContainer({
         name: `${subdomain}-frontend`,
         image: this.configService.get<string>('GHCR_FRONTEND_IMAGE')!,
         env: [
-          `NEXT_PUBLIC_API_URL=https://groumo.com/api`,  // 공유 Backend 사용
-          // GROUMO_TEMPLATE 전용 Supabase 사용 (GROUMO_SETTING과 분리)
-          `NEXT_PUBLIC_SUPABASE_URL=${this.configService.get('TEMPLATE_SUPABASE_URL')}`,
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY=${this.configService.get('TEMPLATE_SUPABASE_ANON_KEY')}`,
-          `NEXT_PUBLIC_TENANT_ID=${tenantId}`,  // 클라이언트 사이드에서 API 호출 시 헤더에 포함
+          `NEXT_PUBLIC_API_URL=https://${baseDomain}/api`,
+          `NEXT_PUBLIC_TENANT_ID=${tenantId}`,
           `TENANT_ID=${tenantId}`,
           `SUBDOMAIN=${subdomain}`,
         ],
@@ -99,18 +88,17 @@ export class DockerService {
 
       await frontendContainer.start();
 
-      this.logger.log(`✅ Tenant deployed: ${subdomain} (Frontend only, Backend shared)`);
+      this.logger.log(`Tenant deployed: ${subdomain}`);
 
       return {
         subdomain,
         url: `https://${subdomain}.${baseDomain}`,
-        backend_container: 'shared',  // Backend 공유 (groumo.com)
         frontend_container: frontendContainer.id,
         schema: schemaName,
         deployed_at: new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error(`❌ Deployment failed for ${subdomain}:`, error);
+      this.logger.error(`Deployment failed for ${subdomain}:`, error);
       throw error;
     }
   }
@@ -166,6 +154,28 @@ export class DockerService {
     }));
   }
 
+  async getDockerStatus() {
+    try {
+      const containers = await this.docker.listContainers({ all: true });
+
+      const status = containers.map((c) => ({
+        id: c.Id.substring(0, 12),
+        name: c.Names[0]?.replace(/^\//, '') || '',
+        image: c.Image,
+        state: c.State,
+        status: c.Status,
+        created: c.Created,
+        tenantId: c.Labels['groumo.tenant.id'],
+        subdomain: c.Labels['groumo.tenant.subdomain'],
+      }));
+
+      return { containers: status, total: status.length };
+    } catch (error) {
+      this.logger.error('Failed to get docker status', error);
+      throw error;
+    }
+  }
+
   private async createContainer(options: ContainerOptions) {
     const { name, image, env, labels, network } = options;
 
@@ -189,9 +199,6 @@ export class DockerService {
     });
   }
 
-  /**
-   * Backend API를 호출하여 group 테이블 초기화
-   */
   private async callBackendInitializeApi(params: {
     tenantId: string;
     organizationName: string;
@@ -232,30 +239,8 @@ export class DockerService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Failed to call backend initialize API`, error);
+      this.logger.error('Failed to call backend initialize API', error);
       throw error;
     }
   }
 }
-
-  async getDockerStatus() {
-    try {
-      const containers = await this.docker.listContainers({ all: true });
-      
-      const status = containers.map((c) => ({
-        id: c.Id.substring(0, 12),
-        name: c.Names[0]?.replace(/^\//, '') || '',
-        image: c.Image,
-        state: c.State,
-        status: c.Status,
-        created: c.Created,
-        tenantId: c.Labels['groumo.tenant.id'],
-        subdomain: c.Labels['groumo.tenant.subdomain'],
-      }));
-
-      return { containers: status, total: status.length };
-    } catch (error) {
-      this.logger.error('Failed to get docker status', error);
-      throw error;
-    }
-  }

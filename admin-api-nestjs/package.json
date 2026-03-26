@@ -16,13 +16,12 @@
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@supabase/supabase-js": "^2.39.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "compression": "^1.7.4",
     "dockerode": "^4.0.2",
     "helmet": "^7.1.0",
-    "pg": "^8.11.3",
+    "mysql2": "^3.11.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
   },
@@ -33,7 +32,6 @@
     "@types/dockerode": "^3.3.31",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "@types/pg": "^8.11.0",
     "typescript": "^5.7.0"
   }
 }
